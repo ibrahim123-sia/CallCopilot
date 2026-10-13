@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Quiet neutral palette (warm stone/zinc) */
+  --background: #fcfbf9;
+  --foreground: #1c1917;
+
+  --surface: #ffffff;
+  --surface-subtle: #f7f6f3;
+  --surface-muted: #eeece8;
+  --surface-border: #e7e5e4;
+
+  --primary: #292524;
+  --primary-hover: #1c1917;
+  --primary-foreground: #fafaf9;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+  --font-urdu: 'Noto Naskh Arabic', 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif;
+}
+
+.dark {
+  --background: #0c0a09;
+  --foreground: #f5f5f4;
+
+  --surface: #171514;
+  --surface-subtle: #1f1c1a;
+  --surface-muted: #292523;
+  --surface-border: #2e2a27;
+
+  --primary: #f5f5f4;
+  --primary-hover: #ffffff;
+  --primary-foreground: #0c0a09;
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.45);
+}
+
+/* Urdu RTL text support */
+.lang-urdu, [dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+  font-family: var(--font-urdu);
+  line-height: 1.8;
+}
+
+/* Print Stylesheet for Vector PDF Generation */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm 16mm 14mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .page-break-before {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Force clean hairline borders in print */
+  .print-border {
+    border: 1px solid #d6d3d1 !important;
+  }
+
+  /* Urdu shaping in print */
+  .rtl-print {
+    direction: rtl !important;
+    text-align: right !important;
+    font-family: 'Noto Naskh Arabic', serif !important;
+  }
+}
