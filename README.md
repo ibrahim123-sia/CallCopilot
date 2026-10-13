@@ -1,5 +1,3 @@
-# README · Contributing · MIT license
-
 # CallCopilot
 **Next.js 15 · React 19 · TypeScript · Tailwind CSS · Google Gemini · Deepgram · License: MIT**
 
@@ -321,7 +319,6 @@ CallCopilot/
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── LICENSE                     # MIT License
-├── CONTRIBUTING.md             # Contributor guidelines
 └── README.md
 ```
 
