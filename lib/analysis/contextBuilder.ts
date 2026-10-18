@@ -1,11 +1,12 @@
 import { TranscriptEntry } from "../types";
+import { formatClockTime } from "../time";
 
 export function formatTranscriptForPrompt(entries: TranscriptEntry[]): string {
   if (entries.length === 0) return "(No speech recorded yet)";
 
   return entries
     .map((e) => {
-      const timeStr = new Date(e.timestamp).toISOString().substring(11, 19);
+      const timeStr = formatClockTime(e.timestamp);
       const speakerLabel = e.speaker === "client" ? "Client" : "Our Team";
       return `[${timeStr}] ${speakerLabel}: ${e.text}`;
     })

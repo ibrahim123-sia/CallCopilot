@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Search, ArrowDown, Copy, Check, MessageSquare } from "lucide-react";
 import { TranscriptEntry } from "@/lib/types";
 import { containsUrdu } from "@/lib/pdf/printTemplate";
+import { formatClockTime } from "@/lib/time";
 
 interface TranscriptPaneProps {
   entries: TranscriptEntry[];
@@ -56,7 +57,7 @@ export function TranscriptPane({
   };
 
   const formatTimestamp = (ts: number) => {
-    return new Date(ts).toISOString().substring(11, 19);
+    return formatClockTime(ts);
   };
 
   return (

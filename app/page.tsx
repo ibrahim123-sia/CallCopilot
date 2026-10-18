@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { TranscriptPane } from "@/components/TranscriptPane";
 import { InsightCardsPane } from "@/components/InsightCardsPane";
@@ -41,7 +42,10 @@ import { AnalysisTriggerController } from "@/lib/analysis/triggerLogic";
 import {
   formatTranscriptForPrompt,
   partitionTranscriptWindow,
+  truncateTranscriptBuffer,
 } from "@/lib/analysis/contextBuilder";
+import { downloadBlob, generatePlainTranscriptText } from "@/lib/export";
+import { formatLocalDate } from "@/lib/time";
 import { CANNED_DEMO_WRAPUP } from "@/lib/analysis/cannedData";
 
 export default function CallCopilotApp() {
@@ -60,12 +64,13 @@ export default function CallCopilotApp() {
     clientName: "Client",
     projectName: "Project",
     meetingGoal: "Discovery",
-    language: "auto",
+    language: "en",
   });
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [clientTalkSeconds, setClientTalkSeconds] = useState(0);
   const [teamTalkSeconds, setTeamTalkSeconds] = useState(0);
   const [transcriptionStatus, setTranscriptionStatus] = useState<TranscriptionStatus>("idle");
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 
   // In-memory Call Data
@@ -79,6 +84,8 @@ export default function CallCopilotApp() {
   const [redFlags, setRedFlags] = useState<RedFlag[]>([]);
   const [userNotes, setUserNotes] = useState("");
   const [wrapUpData, setWrapUpData] = useState<MeetingWrapUp | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   // Modals & Panels
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -90,6 +97,12 @@ export default function CallCopilotApp() {
   const providerRef = useRef<TranscriptionProvider | null>(null);
   const triggerControllerRef = useRef<AnalysisTriggerController | null>(null);
   const lookupInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Provider callbacks are registered once per call, so anything they read must come
+  // from refs — closures over state would be frozen at the moment the call started.
+  const transcriptRef = useRef<TranscriptEntry[]>([]);
+  const analysisInputsRef = useRef({ teamProfile, callContext, isDemo });
+  analysisInputsRef.current = { teamProfile, callContext, isDemo };
 
   // Load local preferences on mount
   useEffect(() => {
@@ -131,103 +144,92 @@ export default function CallCopilotApp() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [screen, transcript.length]);
 
-  // Call timer and talk-time incrementer
+  // Call timer (talk-time is accumulated from final segment durations instead)
   useEffect(() => {
     if (screen !== "calling" || isPaused) return;
-
-    const timer = setInterval(() => {
-      setCallDurationSeconds((prev) => prev + 1);
-
-      // Increment talk split according to current interim / recent speaker
-      if (interimEntry) {
-        if (interimEntry.speaker === "client") {
-          setClientTalkSeconds((prev) => prev + 1);
-        } else {
-          setTeamTalkSeconds((prev) => prev + 1);
-        }
-      }
-    }, 1000);
-
+    const timer = setInterval(() => setCallDurationSeconds((prev) => prev + 1), 1000);
     return () => clearInterval(timer);
-  }, [screen, isPaused, interimEntry]);
+  }, [screen, isPaused]);
 
   // Execute server analysis with rolling context
-  const triggerAnalysis = useCallback(
-    async (abortSignal: AbortSignal) => {
-      if (transcript.length === 0) return;
+  const triggerAnalysis = useCallback(async (abortSignal: AbortSignal) => {
+    const currentTranscript = transcriptRef.current;
+    if (currentTranscript.length === 0) return;
+    const { teamProfile, callContext, isDemo } = analysisInputsRef.current;
 
-      const { recent } = partitionTranscriptWindow(transcript, 240000);
-      const recentText = formatTranscriptForPrompt(recent);
+    const { recent, older } = partitionTranscriptWindow(currentTranscript, 240000);
+    const recentText = formatTranscriptForPrompt(recent);
+    const earlierText = older.length
+      ? truncateTranscriptBuffer(formatTranscriptForPrompt(older), 8000)
+      : "";
 
-      try {
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: abortSignal,
-          body: JSON.stringify({
-            recentTranscript: recentText,
-            rollingSummary: "",
-            teamProfile,
-            callContext,
-            isDemo,
-          }),
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({
+          recentTranscript: recentText,
+          rollingSummary: earlierText,
+          teamProfile,
+          callContext,
+          isDemo,
+        }),
+      });
+
+      if (!res.ok) {
+        console.warn("Analysis response returned non-ok:", res.status);
+        return;
+      }
+
+      const data = await res.json();
+      const overrides = loadTopicOverrides();
+
+      if (Array.isArray(data.topics)) {
+        // Merge topics and apply user overrides if exists
+        const newTopicsWithOverrides = data.topics.map((t: TopicCard) => {
+          const cleanTitle = t.title.toLowerCase().trim();
+          const isKnownUser = overrides.known.some((k) => k.toLowerCase() === cleanTitle);
+          const isNovelUser = overrides.novel.some((n) => n.toLowerCase() === cleanTitle);
+
+          let isNewToTeam = t.isNewToTeam;
+          if (isKnownUser) isNewToTeam = false;
+          if (isNovelUser) isNewToTeam = true;
+
+          return {
+            ...t,
+            isNewToTeam,
+            timestamp: Date.now(),
+          };
         });
 
-        if (!res.ok) {
-          console.warn("Analysis response returned non-ok:", res.status);
-          return;
-        }
-
-        const data = await res.json();
-        const overrides = loadTopicOverrides();
-
-        if (Array.isArray(data.topics)) {
-          // Merge topics and apply user overrides if exists
-          const newTopicsWithOverrides = data.topics.map((t: TopicCard) => {
-            const cleanTitle = t.title.toLowerCase().trim();
-            const isKnownUser = overrides.known.some((k) => k.toLowerCase() === cleanTitle);
-            const isNovelUser = overrides.novel.some((n) => n.toLowerCase() === cleanTitle);
-
-            let isNewToTeam = t.isNewToTeam;
-            if (isKnownUser) isNewToTeam = false;
-            if (isNovelUser) isNewToTeam = true;
-
-            return {
-              ...t,
-              isNewToTeam,
-              timestamp: Date.now(),
-            };
-          });
-
-          setTopicCards((prev) => {
-            const existingIds = new Set(prev.map((c) => c.title.toLowerCase().trim()));
-            const incoming = newTopicsWithOverrides.filter(
-              (c: TopicCard) => !existingIds.has(c.title.toLowerCase().trim())
-            );
-            return [...incoming, ...prev];
-          });
-        }
-
-        if (data.clientIntent) setClientIntent(data.clientIntent);
-        if (Array.isArray(data.signals) && data.signals.length > 0) setSignals(data.signals);
-        if (Array.isArray(data.suggestedReplies) && data.suggestedReplies.length > 0) {
-          setSuggestedReplies(data.suggestedReplies);
-        }
-        if (Array.isArray(data.crossQuestions) && data.crossQuestions.length > 0) {
-          setCrossQuestions(data.crossQuestions);
-        }
-        if (Array.isArray(data.redFlags) && data.redFlags.length > 0) {
-          setRedFlags(data.redFlags);
-        }
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === "AbortError") {
-          return; // Superseeded by newer utterance
-        }
-        console.warn("Analysis call error:", err);
+        setTopicCards((prev) => {
+          const existingIds = new Set(prev.map((c) => c.title.toLowerCase().trim()));
+          const incoming = newTopicsWithOverrides.filter(
+            (c: TopicCard) => !existingIds.has(c.title.toLowerCase().trim())
+          );
+          return [...incoming, ...prev];
+        });
       }
-    },
-    [transcript, teamProfile, callContext, isDemo]
-  );
+
+      if (data.clientIntent) setClientIntent(data.clientIntent);
+      if (Array.isArray(data.signals) && data.signals.length > 0) setSignals(data.signals);
+      if (Array.isArray(data.suggestedReplies) && data.suggestedReplies.length > 0) {
+        setSuggestedReplies(data.suggestedReplies);
+      }
+      if (Array.isArray(data.crossQuestions) && data.crossQuestions.length > 0) {
+        setCrossQuestions(data.crossQuestions);
+      }
+      if (Array.isArray(data.redFlags) && data.redFlags.length > 0) {
+        setRedFlags(data.redFlags);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return; // Superseded by newer utterance
+      }
+      console.warn("Analysis call error:", err);
+    }
+  }, []);
 
   // Initialize trigger controller
   useEffect(() => {
@@ -240,7 +242,7 @@ export default function CallCopilotApp() {
     };
   }, []);
 
-  // Handle incoming transcripts
+  // Handle incoming transcripts (stable identity: registered once per call)
   const handleIncomingTranscript = useCallback(
     (entry: TranscriptEntry) => {
       if (!entry.isFinal) {
@@ -249,35 +251,29 @@ export default function CallCopilotApp() {
       }
 
       setInterimEntry(null);
-      setTranscript((prev) => [...prev, entry]);
+      transcriptRef.current = [...transcriptRef.current, entry];
+      setTranscript(transcriptRef.current);
 
-      // Calculate approximate turn duration towards talk-time
-      const words = entry.text.split(" ").length;
-      const estSeconds = Math.max(1, Math.round(words / 2.5));
+      // Talk-time from the provider's segment duration, falling back to a word-rate estimate
+      const seconds = entry.durationMs
+        ? entry.durationMs / 1000
+        : Math.max(1, entry.text.split(/\s+/).length / 2.5);
       if (entry.speaker === "client") {
-        setClientTalkSeconds((prev) => prev + estSeconds);
+        setClientTalkSeconds((prev) => prev + seconds);
       } else {
-        setTeamTalkSeconds((prev) => prev + estSeconds);
+        setTeamTalkSeconds((prev) => prev + seconds);
       }
 
-      // Pass utterance to debounced analysis controller
-      if (triggerControllerRef.current) {
-        triggerControllerRef.current.handleUtterance(entry, (signal) =>
-          triggerAnalysis(signal)
-        );
-      }
+      triggerControllerRef.current?.handleUtterance(entry, triggerAnalysis);
     },
     [triggerAnalysis]
   );
 
-  // Start Call
-  const handleStartCall = async (
-    mode: "dual" | "mic-only" | "demo",
-    context: CallContext
-  ) => {
-    setCallContext(context);
-    setIsDemo(mode === "demo");
+  const resetCallData = () => {
+    transcriptRef.current = [];
+    triggerControllerRef.current?.reset();
     setTranscript([]);
+    setInterimEntry(null);
     setTopicCards([]);
     setClientIntent("");
     setSignals([]);
@@ -285,17 +281,36 @@ export default function CallCopilotApp() {
     setCrossQuestions([]);
     setRedFlags([]);
     setUserNotes("");
+    setWrapUpData(null);
+    setSummaryError(null);
     setCallDurationSeconds(0);
     setClientTalkSeconds(0);
     setTeamTalkSeconds(0);
     setIsPaused(false);
+    setTranscriptionError(null);
+  };
+
+  const handleStatusChange = useCallback((status: TranscriptionStatus, detail?: string) => {
+    setTranscriptionStatus(status);
+    setTranscriptionError(status === "error" ? detail || "Transcription error" : null);
+  }, []);
+
+  // Start Call
+  const handleStartCall = async (
+    mode: "dual" | "mic-only" | "demo",
+    context: CallContext
+  ) => {
+    resetCallData();
+    setCallContext(context);
+    setIsDemo(mode === "demo");
+    analysisInputsRef.current = { teamProfile, callContext: context, isDemo: mode === "demo" };
     setScreen("calling");
 
     if (mode === "demo") {
       const demoProvider = new DemoTranscriptionProvider();
       providerRef.current = demoProvider;
 
-      demoProvider.onStatusChange((status) => setTranscriptionStatus(status));
+      demoProvider.onStatusChange(handleStatusChange);
       demoProvider.onTranscript(handleIncomingTranscript);
 
       await demoProvider.connect({
@@ -320,76 +335,93 @@ export default function CallCopilotApp() {
       const deepgramProvider = new DeepgramTranscriptionProvider();
       providerRef.current = deepgramProvider;
 
-      deepgramProvider.onStatusChange((status) => setTranscriptionStatus(status));
+      deepgramProvider.onStatusChange(handleStatusChange);
       deepgramProvider.onTranscript(handleIncomingTranscript);
 
       await deepgramProvider.connect({
         language: context.language,
         sampleRate: 16000,
         multichannel: !isMicOnly,
+        keyterms: [
+          context.clientName,
+          context.projectName,
+          teamProfile.companyName,
+          ...teamProfile.coreSkills,
+        ],
       });
     } catch (err: unknown) {
       console.error("Audio capture start failed:", err);
+      audioSessionRef.current?.stop();
+      audioSessionRef.current = null;
       alert(err instanceof Error ? err.message : "Audio initialization failed.");
       setScreen("ready");
     }
   };
 
-  // Pause / Resume
+  // Pause / Resume (provider stops sending audio and reports status itself)
   const handleTogglePause = useCallback(() => {
     if (isPaused) {
       providerRef.current?.resume();
       setIsPaused(false);
-      setTranscriptionStatus("listening");
     } else {
       providerRef.current?.pause();
       setIsPaused(true);
-      setTranscriptionStatus("paused");
     }
   }, [isPaused]);
 
-  // End Call & Summarize
-  const handleEndCall = async () => {
-    // Teardown live capture
-    triggerControllerRef.current?.cancelPending();
-    providerRef.current?.disconnect();
-    providerRef.current = null;
-    audioSessionRef.current?.stop();
-    audioSessionRef.current = null;
-
-    setTranscriptionStatus("disconnected");
-
-    // Fetch meeting wrap-up
-    const fullTranscriptText = formatTranscriptForPrompt(transcript);
-    const pinnedTitles = topicCards.filter((c) => c.pinned).map((c) => c.title);
+  const requestWrapUp = async () => {
+    const { teamProfile, callContext, isDemo } = analysisInputsRef.current;
+    const finalTranscript = transcriptRef.current;
+    setIsSummarizing(true);
+    setSummaryError(null);
 
     try {
+      if (finalTranscript.length === 0 && !isDemo) {
+        throw new Error("No speech was transcribed during this call, so there is nothing to summarize.");
+      }
+
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullTranscript: fullTranscriptText || "Sample CRM discussion",
+          fullTranscript: truncateTranscriptBuffer(formatTranscriptForPrompt(finalTranscript), 79000),
           userNotes,
-          pinnedTopics: pinnedTitles,
+          pinnedTopics: topicCards.filter((c) => c.pinned).map((c) => c.title),
           teamProfile,
           callContext,
           isDemo,
         }),
       });
 
-      if (res.ok) {
-        const wrapUp = await res.json();
-        setWrapUpData(wrapUp);
-      } else {
-        // Fallback to canned wrap-up
-        setWrapUpData(CANNED_DEMO_WRAPUP);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Summary request failed (${res.status})`);
       }
-    } catch (err) {
-      console.warn("Summarize fetch error, fallback to canned wrap up:", err);
-      setWrapUpData(CANNED_DEMO_WRAPUP);
+      setWrapUpData(await res.json());
+    } catch (err: unknown) {
+      console.warn("Summarize failed:", err);
+      if (isDemo) {
+        setWrapUpData(CANNED_DEMO_WRAPUP);
+      } else {
+        // Never substitute canned demo content for a real meeting.
+        setSummaryError(err instanceof Error ? err.message : "Summary generation failed.");
+      }
+    } finally {
+      setIsSummarizing(false);
     }
+  };
 
+  // End Call & Summarize
+  const handleEndCall = async () => {
+    triggerControllerRef.current?.cancelPending();
+    providerRef.current?.disconnect();
+    providerRef.current = null;
+    audioSessionRef.current?.stop();
+    audioSessionRef.current = null;
+    setInterimEntry(null);
+    setTranscriptionStatus("disconnected");
     setScreen("wrapup");
+    await requestWrapUp();
   };
 
   // Quick lookup
@@ -440,9 +472,10 @@ export default function CallCopilotApp() {
   // Keyboard Shortcuts Handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (screen !== "calling") return;
       // Don't trigger shortcuts if inside textarea or input
       const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (targetTag === "input" || targetTag === "textarea") {
+      if (targetTag === "input" || targetTag === "textarea" || targetTag === "select") {
         if (e.key === "Escape") {
           (e.target as HTMLElement).blur();
         }
@@ -469,15 +502,21 @@ export default function CallCopilotApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleTogglePause, suggestedReplies]);
+  }, [screen, handleTogglePause, suggestedReplies]);
 
   // Clean wipe
   const handleClearEverything = () => {
-    setTranscript([]);
-    setTopicCards([]);
-    setUserNotes("");
-    setWrapUpData(null);
+    resetCallData();
     setScreen("ready");
+  };
+
+  const handleDownloadRawTranscript = () => {
+    const safeClient = (callContext.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+    downloadBlob(
+      generatePlainTranscriptText(transcriptRef.current),
+      `Call-Transcript_${safeClient}_${formatLocalDate()}.txt`,
+      "text/plain"
+    );
   };
 
   // Screen 1: Ready Screen
@@ -494,7 +533,54 @@ export default function CallCopilotApp() {
     );
   }
 
-  // Screen 2: Wrap-Up Screen
+  // Screen 2a: Wrap-Up loading / failure
+  if (screen === "wrapup" && !wrapUpData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-surface border border-surface-border rounded-xl shadow-card p-6 space-y-4 text-center">
+          {isSummarizing ? (
+            <>
+              <Loader2 className="w-6 h-6 mx-auto animate-spin text-stone-500" />
+              <p className="text-sm font-medium text-foreground">Generating meeting summary…</p>
+              <p className="text-xs text-stone-500">
+                {transcript.length} transcript lines • this usually takes 10–30 seconds
+              </p>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-6 h-6 mx-auto text-red-600" />
+              <p className="text-sm font-medium text-foreground">Summary could not be generated</p>
+              <p className="text-xs text-stone-500 break-words">{summaryError}</p>
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                <button
+                  onClick={requestWrapUp}
+                  className="px-3 py-1.5 text-xs font-semibold rounded bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900"
+                >
+                  Retry summary
+                </button>
+                {transcript.length > 0 && (
+                  <button
+                    onClick={handleDownloadRawTranscript}
+                    className="px-3 py-1.5 text-xs font-medium rounded border border-surface-border hover:bg-surface-subtle"
+                  >
+                    Download transcript (.txt)
+                  </button>
+                )}
+                <button
+                  onClick={handleClearEverything}
+                  className="px-3 py-1.5 text-xs font-medium rounded border border-surface-border hover:bg-surface-subtle text-stone-500"
+                >
+                  Discard &amp; start over
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Screen 2b: Wrap-Up Screen
   if (screen === "wrapup" && wrapUpData) {
     return (
       <WrapUpScreen
@@ -509,7 +595,6 @@ export default function CallCopilotApp() {
           saveExportOptions(updated);
         }}
         onUpdateWrapUp={(updated) => setWrapUpData(updated)}
-        onBackToCall={() => setScreen("calling")}
         onClearEverything={handleClearEverything}
       />
     );
@@ -534,6 +619,16 @@ export default function CallCopilotApp() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
+
+      {transcriptionError && (
+        <div
+          role="alert"
+          className="px-4 py-1.5 text-xs bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-b border-red-200 dark:border-red-900/40 flex items-center gap-2"
+        >
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Transcription stopped: {transcriptionError}</span>
+        </div>
+      )}
 
       {/* Mobile Tab Switcher */}
       <div className="flex md:hidden border-b border-surface-border bg-surface px-2 py-1 text-xs">

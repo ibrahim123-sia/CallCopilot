@@ -1,4 +1,5 @@
 import { ExportOptions, MeetingWrapUp, TranscriptEntry } from "./types";
+import { formatClockTime } from "./time";
 
 export function generateMarkdownReport(
   wrapUp: MeetingWrapUp,
@@ -139,7 +140,7 @@ export function generateMarkdownReport(
     parts.push("## Appendix: Complete Word-for-Word Transcript");
     parts.push("\n---\n");
     for (const entry of transcript) {
-      const timeStr = new Date(entry.timestamp).toISOString().substring(11, 19);
+      const timeStr = formatClockTime(entry.timestamp);
       const speakerLabel = entry.speaker === "client" ? "Client" : "Our Team";
       parts.push(`**[${timeStr}] ${speakerLabel}:** ${entry.text}\n`);
     }
@@ -151,7 +152,7 @@ export function generateMarkdownReport(
 export function generatePlainTranscriptText(transcript: TranscriptEntry[]): string {
   return transcript
     .map((e) => {
-      const time = new Date(e.timestamp).toISOString().substring(11, 19);
+      const time = formatClockTime(e.timestamp);
       const speaker = e.speaker === "client" ? "CLIENT" : "OUR TEAM";
       return `[${time}] ${speaker}:\n${e.text}\n`;
     })

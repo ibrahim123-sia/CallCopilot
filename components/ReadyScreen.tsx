@@ -26,11 +26,11 @@ export function ReadyScreen({
   consentGiven,
   onConsentChange,
 }: ReadyScreenProps) {
-  const [selectedMode, setSelectedMode] = useState<"dual" | "mic-only" | "demo">("demo");
-  const [clientName, setClientName] = useState("Alex Rivers");
-  const [projectName, setProjectName] = useState("CRM AI Assistant Pilot");
-  const [meetingGoal, setMeetingGoal] = useState("Scope & Architecture Discovery");
-  const [language, setLanguage] = useState<"en" | "ur" | "auto">("auto");
+  const [selectedMode, setSelectedMode] = useState<"dual" | "mic-only" | "demo">("dual");
+  const [clientName, setClientName] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [meetingGoal, setMeetingGoal] = useState("");
+  const [language, setLanguage] = useState<"en" | "ur" | "auto">("en");
   const [consentError, setConsentError] = useState(false);
 
   const handleStart = () => {
@@ -133,7 +133,7 @@ export function ReadyScreen({
               <div className="p-2.5 rounded bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>
-                  <strong>Browser Tab Audio Tip:</strong> Works best on Chrome and Edge. When the browser displays the screen picker, select <em>&quot;Chrome Tab&quot;</em> and make sure the <strong>&quot;Share tab audio&quot;</strong> checkbox at the bottom is checked.
+                  <strong>Browser Tab Audio Tip:</strong> Works best on Chrome and Edge. When the browser displays the screen picker, select <em>&quot;Chrome Tab&quot;</em> and make sure the <strong>&quot;Share tab audio&quot;</strong> checkbox at the bottom is checked. <strong>Use headphones</strong> — otherwise your mic also picks up the client&apos;s voice from the speakers and it gets labelled as your team.
                 </span>
               </div>
             )}
@@ -187,9 +187,9 @@ export function ReadyScreen({
                   onChange={(e) => setLanguage(e.target.value as "en" | "ur" | "auto")}
                   className="w-full px-2.5 py-1.5 text-xs bg-surface-subtle border border-surface-border rounded focus:outline-none focus:ring-1 focus:ring-stone-400 text-foreground"
                 >
-                  <option value="auto">Auto / Mixed (English + Urdu)</option>
-                  <option value="en">English (US/UK)</option>
-                  <option value="ur">Urdu (اردو)</option>
+                  <option value="en">English</option>
+                  <option value="auto">Mixed (English + Hindi/other, no Urdu)</option>
+                  <option value="ur">Urdu only (اردو)</option>
                 </select>
               </div>
             </div>

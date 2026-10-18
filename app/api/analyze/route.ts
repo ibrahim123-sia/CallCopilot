@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   );
 
   const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-  const modelName = env.GEMINI_MODEL || "gemini-2.5-flash";
+  const modelName = env.GEMINI_LIVE_MODEL;
 
   let rawOutputText = "";
   const groundingSources: Array<{ title: string; url: string }> = [];

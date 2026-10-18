@@ -1,4 +1,5 @@
 import { ExportOptions, MeetingWrapUp, TranscriptEntry } from "../types";
+import { formatClockTime } from "../time";
 
 export function containsUrdu(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
@@ -613,7 +614,7 @@ export function buildPrintableHtml(
     <div>
       ${transcript
         .map((entry) => {
-          const time = new Date(entry.timestamp).toISOString().substring(11, 19);
+          const time = formatClockTime(entry.timestamp);
           const isClient = entry.speaker === "client";
           return `
         <div class="transcript-entry">

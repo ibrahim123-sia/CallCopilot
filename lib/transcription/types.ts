@@ -14,6 +14,7 @@ export interface ProviderConnectOptions {
   multichannel?: boolean;
   sampleRate?: number;
   speedMultiplier?: number; // for demo mode acceleration
+  keyterms?: string[]; // names / jargon to bias recognition (Deepgram Nova-3 keyterm prompting)
 }
 
 export type TranscriptCallback = (entry: TranscriptEntry) => void;

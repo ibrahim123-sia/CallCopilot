@@ -40,7 +40,7 @@ CALL CONTEXT:
 - Project: ${callContext.projectName || "Prospective Software Project"}
 - Call Goal: ${callContext.meetingGoal || "Discovery & Technical Alignment"}
 
-${rollingSummary ? `ROLLING CALL SUMMARY SO FAR:\n${rollingSummary}\n` : ""}
+${rollingSummary ? `EARLIER IN THIS CALL (older transcript, may be truncated):\n"""\n${rollingSummary}\n"""\n` : ""}
 
 RECENT TRANSCRIPT (Chronological):
 """

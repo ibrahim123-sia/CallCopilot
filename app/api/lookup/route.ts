@@ -87,7 +87,7 @@ Generate a JSON object matching this schema:
 
   try {
     const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-    const modelName = env.GEMINI_MODEL || "gemini-2.5-flash";
+    const modelName = env.GEMINI_LIVE_MODEL;
 
     const response = await ai.models.generateContent({
       model: modelName,

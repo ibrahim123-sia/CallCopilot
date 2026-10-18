@@ -30,6 +30,7 @@ import {
   generatePlainTranscriptText,
 } from "@/lib/export";
 import { triggerPrintOrSavePdf } from "@/lib/pdf/pdfGenerator";
+import { formatLocalDate } from "@/lib/time";
 
 interface WrapUpScreenProps {
   wrapUp: MeetingWrapUp;
@@ -39,7 +40,7 @@ interface WrapUpScreenProps {
   exportOptions: ExportOptions;
   onUpdateExportOptions: (opts: Partial<ExportOptions>) => void;
   onUpdateWrapUp: (updated: MeetingWrapUp) => void;
-  onBackToCall: () => void;
+  onBackToCall?: () => void;
   onClearEverything: () => void;
 }
 
@@ -60,7 +61,7 @@ export function WrapUpScreen({
   const [newTaskTitle, setNewTaskTitle] = useState("");
 
   const durationStr = `${Math.floor(callDurationSeconds / 60)}m ${callDurationSeconds % 60}s`;
-  const dateStr = new Date().toISOString().substring(0, 10);
+  const dateStr = formatLocalDate();
 
   const metadata = {
     clientName: callContext.clientName || "Client",
@@ -144,14 +145,18 @@ export function WrapUpScreen({
       {/* Top Header Bar */}
       <header className="h-14 border-b border-surface-border bg-surface px-6 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToCall}
-            className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400 hover:text-foreground font-medium px-2 py-1 rounded hover:bg-surface-subtle"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Resume Call</span>
-          </button>
-          <div className="h-4 w-[1px] bg-surface-border" />
+          {onBackToCall && (
+            <>
+              <button
+                onClick={onBackToCall}
+                className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-400 hover:text-foreground font-medium px-2 py-1 rounded hover:bg-surface-subtle"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
+              <div className="h-4 w-[1px] bg-surface-border" />
+            </>
+          )}
           <h1 className="text-sm font-semibold tracking-tight text-foreground">
             Meeting Wrap-Up & Report
           </h1>

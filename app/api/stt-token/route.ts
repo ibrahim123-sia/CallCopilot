@@ -3,6 +3,10 @@ import { DeepgramClient } from "@deepgram/sdk";
 import { getServerEnv } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rateLimit";
 
+// Short-lived JWT: only needs to be valid long enough to open the WebSocket.
+// An open connection stays alive after the token expires; reconnects fetch a fresh one.
+const TOKEN_TTL_SECONDS = 60;
+
 export async function GET(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
   const rate = checkRateLimit(ip, 30);
@@ -28,44 +32,22 @@ export async function GET(req: NextRequest) {
 
   try {
     const deepgram = new DeepgramClient({ apiKey });
-    let projectId = env.DEEPGRAM_PROJECT_ID;
+    const grant = await deepgram.auth.v1.tokens.grant({ ttl_seconds: TOKEN_TTL_SECONDS });
 
-    if (!projectId) {
-      // Look up primary project ID
-      const projectsRes = await deepgram.manage.v1.projects.list();
-      const firstProject = projectsRes.projects?.[0];
-      if (firstProject?.project_id) {
-        projectId = firstProject.project_id;
-      }
-    }
-
-    if (projectId) {
-      // Mint a temporary short-lived key (valid for 10 minutes / 600s)
-      const keyRes = await deepgram.manage.v1.projects.keys.create(projectId, {
-        comment: "CallCopilot ephemeral session",
-        time_to_live_in_seconds: 600,
-        scopes: ["usage:write"],
-      });
-
-      if (keyRes.key) {
-        return NextResponse.json({
-          token: keyRes.key,
-          expiresInSeconds: 600,
-        });
-      }
-    }
-
-    // Fallback: If project scoping is unavailable, return direct token for connection
     return NextResponse.json({
-      token: apiKey,
-      expiresInSeconds: 300,
+      token: grant.access_token,
+      scheme: "bearer",
+      expiresInSeconds: grant.expires_in ?? TOKEN_TTL_SECONDS,
     });
   } catch (err: unknown) {
+    // Never fall back to handing the master API key to the browser.
     console.error("Error generating Deepgram token:", err);
-    // If project key creation failed (e.g. standard tier permissions), provide direct key safely for direct wss
-    return NextResponse.json({
-      token: apiKey,
-      expiresInSeconds: 300,
-    });
+    return NextResponse.json(
+      {
+        error:
+          "Could not mint a temporary Deepgram token. Make sure your API key has Member (or higher) permissions.",
+      },
+      { status: 502 }
+    );
   }
 }
