@@ -14,7 +14,9 @@ export function buildPrintableHtml(
     projectName: string;
     dateStr: string;
     durationStr: string;
-  }
+  },
+  /** Roman Urdu translation per transcript entry id (shown when options.includeTranslation). */
+  translations: Record<string, string> = {}
 ): string {
   const isInternal = options.audience === "internal";
   const showInternal = isInternal && options.includeInternalSections;
@@ -292,6 +294,13 @@ export function buildPrintableHtml(
     }
 
     /* Appendix Transcript */
+    .translation {
+      margin-top: 2px;
+      color: #57534e;
+      font-style: italic;
+      font-size: 8.5pt;
+    }
+
     .transcript-entry {
       margin-bottom: 8px;
       padding: 6px 10px;
@@ -608,7 +617,7 @@ export function buildPrintableHtml(
   <div class="page-break-before" style="margin-top: 20px;">
     <div style="border-bottom: 2px solid #292524; padding-bottom: 6px; margin-bottom: 14px;">
       <h2 style="font-size: 13pt; font-weight: 700; text-transform: uppercase;">Appendix: Word-for-Word Call Transcript</h2>
-      <p style="font-size: 8pt; color: #78716c;">Complete record with speaker separation and chronological timestamps</p>
+      <p style="font-size: 8pt; color: #78716c;">Complete record with speaker separation and chronological timestamps${options.includeTranslation ? " • Roman Urdu translation in italics" : ""}</p>
     </div>
 
     <div>
@@ -625,6 +634,11 @@ export function buildPrintableHtml(
             </span>
           </div>
           <div>${renderTextWithRtl(entry.text)}</div>
+          ${
+            options.includeTranslation && translations[entry.id]
+              ? `<div class="translation">${escapeHtml(translations[entry.id])}</div>`
+              : ""
+          }
         </div>
         `;
         })
@@ -636,7 +650,7 @@ export function buildPrintableHtml(
   }
 
   <div class="footer">
-    <span>CallCopilot Ephemeral Report • Generated in browser</span>
+    <span>CallCopilot Meeting Report</span>
     <span>${escapeHtml(metadata.dateStr)}</span>
   </div>
 
