@@ -67,6 +67,9 @@ export interface SuggestedReply {
 export interface CrossQuestion {
   question: string;
   whyAsk: string;
+  /** "history" when the question builds on a previous meeting or document. */
+  basedOn?: "current" | "history";
+  reference?: string;
 }
 
 export interface RedFlag {
@@ -82,6 +85,8 @@ export interface AnalysisResult {
   suggestedReplies: SuggestedReply[];
   crossQuestions: CrossQuestion[];
   redFlags: RedFlag[];
+  /** Open items from earlier meetings that the conversation just covered (verbatim text). */
+  addressedOpenItems?: string[];
 }
 
 export interface TeamProfile {
@@ -164,6 +169,125 @@ export interface ExportOptions {
   includeNotes: boolean;
   includeInternalSections: boolean; // only in internal mode
   includeFullTranscript: boolean; // unchecked by default
+  includeTranslation?: boolean; // Roman Urdu next to each transcript line
   companyName: string;
   logoDataUrl?: string;
+}
+
+/** AI-maintained living memory for a client, updated after every meeting. */
+export interface ClientBrief {
+  summary: string;
+  stakeholders: Array<{ name: string; role: string; notes?: string }>;
+  goals: string[];
+  requirements: string[];
+  budget?: string;
+  timeline?: string;
+  techStack: string[];
+  decisions: string[];
+  openQuestions: string[];
+  ourCommitments: string[];
+  clientCommitments: string[];
+  preferences: string[];
+  risks: string[];
+}
+
+export const EMPTY_CLIENT_BRIEF: ClientBrief = {
+  summary: "",
+  stakeholders: [],
+  goals: [],
+  requirements: [],
+  techStack: [],
+  decisions: [],
+  openQuestions: [],
+  ourCommitments: [],
+  clientCommitments: [],
+  preferences: [],
+  risks: [],
+};
+
+export interface ClientRecord {
+  id: string;
+  name: string;
+  company: string;
+  notes: string;
+  brief: ClientBrief | null;
+  pendingBrief: ClientBrief | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ClientListItem extends ClientRecord {
+  meetingCount: number;
+  lastMeetingAt: number | null;
+}
+
+export type MeetingStatus = "live" | "ended" | "summarized" | "imported";
+
+export interface MeetingRecord {
+  id: string;
+  clientId: string;
+  title: string;
+  goal: string;
+  language: string;
+  status: MeetingStatus | string;
+  source: string;
+  startedAt: number;
+  endedAt: number | null;
+  durationSeconds: number;
+  clientTalkSeconds: number;
+  teamTalkSeconds: number;
+  notes: string;
+  wrapUp: MeetingWrapUp | null;
+  pinnedTopics: string[];
+}
+
+export interface StoredSegment {
+  id: string;
+  meetingId: string;
+  seq: number;
+  speaker: Speaker;
+  text: string;
+  translation: string | null;
+  timestamp: number;
+  durationMs: number | null;
+}
+
+export interface DocumentRecord {
+  id: string;
+  clientId: string;
+  title: string;
+  kind: string;
+  mimeType: string;
+  text: string;
+  createdAt: number;
+}
+
+export interface ChatMessageRecord {
+  id: string;
+  clientId: string;
+  role: "user" | "assistant";
+  content: string;
+  sources: TopicSource[];
+  createdAt: number;
+}
+
+export type SttProviderId = "gemini" | "deepgram";
+
+export interface AiPacingSettings {
+  /** Minimum seconds between live analysis requests (free-tier friendly). */
+  analysisMinIntervalSec: number;
+  /** Live Roman Urdu captions on/off. */
+  translationEnabled: boolean;
+  /** Seconds to batch final caption lines before translating. */
+  translationBatchSec: number;
+}
+
+export interface AppSettings {
+  teamProfile: TeamProfile;
+  exportOptions: ExportOptions;
+  pacing: AiPacingSettings;
+  sttProvider: SttProviderId;
+  /** Which LLM provider is tried first; the other is the automatic fallback. */
+  llmPrimary: "groq" | "gemini";
+  captionLayout: "side-by-side" | "stacked";
 }
