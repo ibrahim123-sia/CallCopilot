@@ -15,7 +15,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
     { key: "Space", desc: "Pause or Resume live audio transcription" },
     { key: "L", desc: "Focus the Quick Lookup input box" },
     { key: "C", desc: "Copy the top suggested response to clipboard" },
-    { key: "P", desc: "Toggle Pinned insight cards view" },
+    { key: "T", desc: "Turn Roman Urdu captions on or off" },
     { key: "?", desc: "Toggle this Keyboard Shortcuts reference" },
     { key: "Esc", desc: "Close open modal dialogs" },
   ];

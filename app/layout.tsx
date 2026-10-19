@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Noto_Naskh_Arabic } from "next/font/google";
+import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 const sans = Inter({
@@ -22,10 +23,13 @@ const urdu = Noto_Naskh_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "CallCopilot - Real-time Live Client Call Assistant",
+  title: "CallCopilot",
   description:
-    "Stateless, in-memory live client call copilot with dual-channel transcription, real-time insight cards, NEW skill detection, and executive wrap-up PDF reports.",
+    "Live client-call copilot with per-client memory, English + Roman Urdu captions, AI suggestions, and PDF meeting reports.",
 };
+
+// Applied before paint so dark mode never flashes light
+const themeScript = `try{var t=localStorage.getItem("callcopilot_theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -33,9 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${urdu.variable} antialiased`}>
-      <body className="min-h-screen bg-background text-foreground font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-150">
-        {children}
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${urdu.variable} antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-screen bg-background text-foreground font-sans selection:bg-stone-200 dark:selection:bg-stone-800">
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

@@ -35,6 +35,99 @@
   --primary-foreground: #0c0a09;
 }
 
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ---------- Reusable UI primitives (kept in CSS so markup stays readable) ---------- */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 dark:focus-visible:ring-stone-500
+      disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:opacity-90 shadow-subtle;
+  }
+  .btn-secondary {
+    @apply bg-surface border border-surface-border text-foreground hover:bg-surface-subtle;
+  }
+  .btn-ghost {
+    @apply text-stone-600 dark:text-stone-300 hover:bg-surface-subtle hover:text-foreground;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+  .btn-lg {
+    @apply px-4 py-2 text-sm;
+  }
+  .btn-icon {
+    @apply p-1.5;
+  }
+
+  .card {
+    @apply bg-surface border border-surface-border rounded-xl shadow-card;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-surface-border bg-surface-subtle px-2.5 py-1.5 text-sm text-foreground
+      placeholder:text-stone-400 dark:placeholder:text-stone-500
+      focus:outline-none focus:ring-2 focus:ring-stone-300 dark:focus:ring-stone-600;
+  }
+
+  .label {
+    @apply block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1;
+  }
+
+  .section-title {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border;
+  }
+  .chip-neutral {
+    @apply bg-surface-subtle text-stone-600 dark:text-stone-300 border-surface-border;
+  }
+  .chip-client {
+    @apply bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900;
+  }
+  .chip-new {
+    @apply bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800;
+  }
+  .chip-history {
+    @apply bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900;
+  }
+  .chip-success {
+    @apply bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900;
+  }
+  .chip-danger {
+    @apply bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900;
+  }
+
+  .tabs {
+    @apply flex items-center gap-1 border-b border-surface-border;
+  }
+  .tab {
+    @apply -mb-px border-b-2 border-transparent px-3 py-2 text-xs font-medium text-stone-500 hover:text-foreground transition-colors;
+  }
+  .tab-active {
+    @apply border-foreground text-foreground;
+  }
+
+  .segmented {
+    @apply inline-flex items-center rounded-md border border-surface-border bg-surface-subtle p-0.5 text-xs;
+  }
+  .segmented > button {
+    @apply rounded px-2.5 py-1 font-medium text-stone-500 hover:text-foreground transition-colors;
+  }
+  .segmented > button[aria-pressed="true"] {
+    @apply bg-surface text-foreground shadow-subtle;
+  }
+}
+
 /* Custom smooth scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
