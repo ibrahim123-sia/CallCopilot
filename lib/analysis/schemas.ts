@@ -48,6 +48,8 @@ export const SuggestedReplySchema = z.object({
 export const CrossQuestionSchema = z.object({
   question: z.string(),
   whyAsk: z.string(),
+  basedOn: z.enum(["current", "history"]).default("current"),
+  reference: z.string().optional(),
 });
 
 export const RedFlagSchema = z.object({
@@ -63,6 +65,7 @@ export const AnalysisResultSchema = z.object({
   suggestedReplies: z.array(SuggestedReplySchema).default([]),
   crossQuestions: z.array(CrossQuestionSchema).default([]),
   redFlags: z.array(RedFlagSchema).default([]),
+  addressedOpenItems: z.array(z.string()).default([]),
 });
 
 export const QuickLookupRequestSchema = z.object({
@@ -132,6 +135,28 @@ export const MeetingWrapUpSchema = z.object({
     body: z.string(),
     tone: z.enum(["formal", "consultative", "concise"]).default("consultative"),
   }),
+});
+
+export const ClientBriefSchema = z.object({
+  summary: z.string().default(""),
+  stakeholders: z
+    .array(z.object({ name: z.string(), role: z.string().default(""), notes: z.string().optional() }))
+    .default([]),
+  goals: z.array(z.string()).default([]),
+  requirements: z.array(z.string()).default([]),
+  budget: z.string().optional(),
+  timeline: z.string().optional(),
+  techStack: z.array(z.string()).default([]),
+  decisions: z.array(z.string()).default([]),
+  openQuestions: z.array(z.string()).default([]),
+  ourCommitments: z.array(z.string()).default([]),
+  clientCommitments: z.array(z.string()).default([]),
+  preferences: z.array(z.string()).default([]),
+  risks: z.array(z.string()).default([]),
+});
+
+export const TranslationResultSchema = z.object({
+  items: z.array(z.object({ id: z.string(), romanUrdu: z.string() })).default([]),
 });
 
 export type AnalysisResultParsed = z.infer<typeof AnalysisResultSchema>;
