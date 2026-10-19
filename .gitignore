@@ -32,3 +32,14 @@ next-env.d.ts
 # OS
 .DS_Store
 Thumbs.db
+
+# local database (client meetings stay on this machine)
+/data/
+
+# personal technical guide (kept locally, not committed)
+/docs/
+
+# Cloudflare / OpenNext build output and local secrets
+/.open-next/
+/.wrangler/
+.dev.vars
