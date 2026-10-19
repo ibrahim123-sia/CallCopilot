@@ -1,0 +1,46 @@
+// Cloudflare Workers configuration for CallCopilot (used by `npm run cf:*` scripts).
+// Docs: docs/cloudflare-guide.pdf
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "callcopilot",
+  // OpenNext builds the Next.js app into this worker + static assets
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Lets OpenNext call this worker from itself (used for caching/revalidation)
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "callcopilot" }],
+
+  // D1 = Cloudflare's SQLite database. Create it once with:
+  //   npx wrangler d1 create callcopilot
+  // then paste the printed database_id below.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "callcopilot",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      // Same SQL migrations Drizzle generates for the local SQLite file
+      "migrations_dir": "drizzle"
+    }
+  ],
+
+  // Browser Rendering: headless Chrome on Cloudflare, used to make PDF reports
+  "browser": { "binding": "BROWSER" },
+
+  // Non-secret settings. Secrets (API keys) are set with `npx wrangler secret put NAME`.
+  "vars": {
+    "GEMINI_STT_MODEL": "gemini-3.5-transcribe-live",
+    "GEMINI_LIVE_MODEL": "gemini-3.5-flash-lite",
+    "GEMINI_TRANSLATE_MODEL": "gemini-3.1-flash-lite",
+    "GEMINI_MODEL": "gemini-3.8-flash",
+    "GROQ_LIVE_MODEL": "openai/gpt-oss-20b",
+    "GROQ_TRANSLATE_MODEL": "qwen/qwen3.8-27b",
+    "GROQ_MODEL": "openai/gpt-oss-120b",
+    "GROQ_MAX_TOKENS_PER_REQUEST": "7000"
+  },
+
+  "observability": { "enabled": true }
+}

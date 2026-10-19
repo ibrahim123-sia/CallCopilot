@@ -1,0 +1,11 @@
+# Secrets for `npm run cf:preview` (local Cloudflare Workers runtime).
+# Copy to .dev.vars (git-ignored). In production set them with:
+#   npx wrangler secret put GEMINI_API_KEY
+#   npx wrangler secret put GROQ_API_KEY
+NEXTJS_ENV=development
+GEMINI_API_KEY=your_gemini_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
+
+# Optional: Cloudflare Access protection (see docs/cloudflare-guide.pdf, step 7)
+# CF_ACCESS_TEAM_DOMAIN=yourteam.cloudflareaccess.com
+# CF_ACCESS_AUD=your_application_audience_tag
