@@ -67,7 +67,7 @@ export class DeepgramTranscriptionProvider implements TranscriptionProvider {
   private async fetchToken(): Promise<{ token: string; scheme: string } | null> {
     if (this.options.token) return { token: this.options.token, scheme: "token" };
     try {
-      const res = await fetch("/api/stt-token");
+      const res = await fetch("/api/stt-token?provider=deepgram");
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.token) {
         throw new Error(data.error || `Failed to obtain STT token (${res.status})`);
